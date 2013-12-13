@@ -1,0 +1,13 @@
+// $Id$
+// vim:ft=javascript
+
+// If your extension references something external, use ARG_WITH
+// ARG_WITH("mpl", "for mpl support", "no");
+
+// Otherwise, use ARG_ENABLE
+// ARG_ENABLE("mpl", "enable mpl support", "no");
+
+if (PHP_MPL != "no") {
+	EXTENSION("mpl", "mpl.c");
+}
+
