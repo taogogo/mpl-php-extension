@@ -13,7 +13,8 @@ phpize
 ./configure 
 make
 make install
-echo "extension=mpl.so">> /etc/php.ini
+echo "extension=mpl.so" >> /etc/php.ini
+echo "mpl_data_path=/var/www/phone.data" >> /etc/php.ini
 ```
 ##eg:
 ```php
