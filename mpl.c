@@ -26,6 +26,11 @@
 #include "php_ini.h"
 #include "ext/standard/info.h"
 #include "php_mpl.h"
+//hash map struct
+#include "cmap.c"
+struct StrHashTable tbl = {{0},NULL,NULL,simple_strhash,strcmp};
+zval *cfg_value_uhm;
+zval *cfg_value;
 
 /* If you declare any globals in php_mpl.h uncomment this:
 ZEND_DECLARE_MODULE_GLOBALS(mpl)
@@ -77,7 +82,46 @@ PHP_MINIT_FUNCTION(mpl)
     zend_class_entry Mpl_entry;
     INIT_CLASS_ENTRY(Mpl_entry, "Mpl", mpl_methods);
     Mpl_ce = zend_register_internal_class_ex(&Mpl_entry, NULL, NULL TSRMLS_CC);//注册类
-   
+    //开启开关，则载入扩展时，读取数据载入内存
+    
+    char *cfg_name_uhm="mpl_use_hashmap";
+    cfg_value_uhm = cfg_get_entry(cfg_name_uhm, strlen(cfg_name_uhm) + 1);
+	if(!cfg_value_uhm){
+		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "mpl_use_hashmap should be set in php.ini");
+		return SUCCESS;
+	}
+    char *cfg_name="mpl_data_path";
+    cfg_value = cfg_get_entry(cfg_name, strlen(cfg_name) + 1);
+    if(!cfg_value){
+		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "mpl_data_path should be set in php.ini");
+		return SUCCESS;
+	}
+    
+	if(strcmp(Z_STRVAL_P(cfg_value_uhm), "1") == 0){
+		FILE *fp;
+		char phone_key[8];
+		char phone_value[100];
+		
+		int pre_len = 7;
+		//hashmap
+		if((fp=fopen(Z_STRVAL_P(cfg_value),"r"))==NULL) {
+			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Cannot open mbl data file");
+			return SUCCESS;
+		}else{
+			int line_no = 0;
+			while (fgets(phone_key,pre_len+1,fp)!=NULL) {
+				fseek(fp,-pre_len,SEEK_CUR);
+				fgets(phone_value,100,fp);
+				strncpy(phone_keys[line_no], phone_key, pre_len); 
+				strncpy(phone_values[line_no], phone_value, 100); 
+				cmap_insert(&tbl,phone_keys[line_no],phone_values[line_no]);
+				
+				//this total cost 3+ seconds
+				//cmap_insert(&tbl,malloc_value(phone_key),malloc_value(phone_value));
+				line_no++;
+			}
+		}
+	}
    
 
 	return SUCCESS;
@@ -143,6 +187,7 @@ PHP_METHOD(Mpl, getLocation) {
 	FILE *fp;
 	char str[8];
 	char result[100];
+	char str_value[100];
 	int has_result = 0;
 	int pre_len = 7;
 	char phone_pre[8];
@@ -150,32 +195,32 @@ PHP_METHOD(Mpl, getLocation) {
 		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Argument length should be 7 or more");
 		return;
 	}
-	
+	//zend_printf("debug:%s",result);
 	strncpy(phone_pre, arg, 7); 
- 
-    zval *cfg_value;
-    char *cfg_name="mpl_data_path";
-    cfg_value = cfg_get_entry(cfg_name, strlen(cfg_name) + 1);
-    if(!cfg_value){
-		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "mpl_data_path should be set in php.ini");
-		return;
-	}
-	//zend_printf("path:%s\n",Z_STRVAL_P(cfg_value));
-	if((fp=fopen(Z_STRVAL_P(cfg_value),"r"))==NULL) {
-		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Cannot open mbl data file");
-		return;
-	}else{
-		while (fgets(str,pre_len+1,fp)!=NULL) {
-			if(strcmp(str,phone_pre)==0){
-				fseek(fp,-pre_len,SEEK_CUR);
-				fgets(result,100,fp);
-				has_result = 1;
-				break;
-			}
+	//开启开关，则载入扩展时，读取数据载入内存
+	if(strcmp(Z_STRVAL_P(cfg_value_uhm), "1") == 0){
+		if(cmap_get(&tbl,phone_pre)){
+			has_result = 1;
+			strncpy(result, (char*)cmap_get(&tbl,phone_pre), 100); 
 		}
-		fclose(fp);
+	}else{
+		if((fp=fopen(Z_STRVAL_P(cfg_value),"r"))==NULL) {
+			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Cannot open mbl data file");
+			return;
+		}else{
+			while (fgets(str,pre_len+1,fp)!=NULL) {
+				if(strcmp(str,phone_pre)==0){
+					fseek(fp,-pre_len,SEEK_CUR);
+					fgets(result,100,fp);
+					//zend_printf("debug:%s",result);
+					has_result = 1;
+					break;
+				}
+			}
+			fclose(fp);
+		}
 	}
-
+	
 	if(has_result == 0){
 		//php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Cannot find this mobile phone number in data file");
 		return;
@@ -183,16 +228,18 @@ PHP_METHOD(Mpl, getLocation) {
 		array_init(return_value);
 		char *delim = " ";
 		char *slice_value;
-		char value_keys[5][9] = {
+		char value_keys[5][10] = {
 			"province",
 			"city",
 			"type",
 			"area_code",
 			"post_code",
 		};
+		//zend_printf("if %s,%s,%s",strstr(strtok(result, delim),phone_pre),strtok(result, delim),phone_pre);
 		if(strstr(strtok(result, delim),phone_pre)){
 			for(int i=0;i<5;i++){
 				slice_value = strtok(NULL, delim);
+				//zend_printf("v:%s",slice_value);
 				if(slice_value){
 					add_assoc_string(return_value,value_keys[i],slice_value,1);
 				}

@@ -53,6 +53,9 @@ PHP_METHOD(Mpl,getLocation);
 
 #endif	/* PHP_MPL_H */
 
+char phone_keys[386764][8];
+char phone_values[386764][100];
+
 
 /*
  * Local variables:
