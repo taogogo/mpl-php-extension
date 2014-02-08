@@ -6,7 +6,7 @@ mpl is a php extension for getting mobile phone number location.
 
 mpl是一个通过手机号码获取号码归属地的php扩展。
 现在是简单的顺序查找，同样的逻辑，查询速度比php快5~9倍。
-将来有空了我会用hashmap或其他数据结构来优化。
+将来有空了我会用map或其他数据结构来优化。
 
 ##install:
 ```shell
